@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/1c-debug-mcp/go/internal/events"
@@ -56,6 +57,9 @@ type EvalItem struct {
 // Client is the HTTP client for the 1C debug server (dbgs.exe).
 type Client struct {
 	http *http.Client
+	// compactBPInfo is set once the platform has rejected the extended <bpInfo>
+	// element set, so subsequent setBreakpoints calls skip the failing attempt.
+	compactBPInfo atomic.Bool
 }
 
 // New creates a new Client.
@@ -300,9 +304,33 @@ func (c *Client) SetBreakpoints(s *session.Session, bp *xmlproto.BPWorkspace, ta
 		_ = c.ClearBreakOnNextStatement(s)
 		_ = c.AttachDetachTargets(s, []xmlproto.TargetID{*targetID}, true)
 	}
-	xmlBody := xmlproto.BuildSetBreakpointsXML(s.Alias, s.ID, bp)
-	_, _, err := c.post(s.URL, "setBreakpoints", xmlBody)
-	return err
+	compact := c.compactBPInfo.Load()
+	body, status, err := c.post(s.URL, "setBreakpoints", xmlproto.BuildSetBreakpointsXML(s.Alias, s.ID, bp, compact))
+	if err != nil {
+		return err
+	}
+	if status == http.StatusOK {
+		return nil
+	}
+
+	// Platforms before 8.3.24 don't know the extended <bpInfo> properties and
+	// answer 400 with an XDTO conversion error. Retry once with the compact
+	// element set and remember the choice for the whole session.
+	if !compact && status == http.StatusBadRequest {
+		logger.Info("setBreakpoints: platform rejected extended bpInfo (%s), retrying with compact format",
+			xmlproto.ExceptionDescr(body))
+		body, status, err = c.post(s.URL, "setBreakpoints", xmlproto.BuildSetBreakpointsXML(s.Alias, s.ID, bp, true))
+		if err != nil {
+			return err
+		}
+		if status == http.StatusOK {
+			c.compactBPInfo.Store(true)
+			logger.Info("setBreakpoints: compact bpInfo accepted, using it from now on")
+			return nil
+		}
+	}
+
+	return fmt.Errorf("setBreakpoints failed: HTTP %d: %s", status, xmlproto.ExceptionDescr(body))
 }
 
 // AttachDetachTargets attaches or detaches a list of debug targets.

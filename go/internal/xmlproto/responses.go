@@ -18,6 +18,23 @@ func StripNamespacePrefixes(s string) string {
 	return s
 }
 
+// exceptionDescrRe extracts the <descr> text of a platform exception document,
+// which is what the debug server returns instead of a response on HTTP 4xx.
+var exceptionDescrRe = regexp.MustCompile(`(?s)<(?:\w+:)?descr>(.*?)</(?:\w+:)?descr>`)
+
+// ExceptionDescr returns the human-readable description of a platform exception
+// response, or a trimmed fragment of the body when it is not one.
+func ExceptionDescr(body string) string {
+	if m := exceptionDescrRe.FindStringSubmatch(body); len(m) == 2 {
+		return strings.Join(strings.Fields(m[1]), " ")
+	}
+	body = strings.TrimSpace(body)
+	if len(body) > 200 {
+		return body[:200] + "…"
+	}
+	return body
+}
+
 // --- Attach response ---
 
 type AttachResponse struct {

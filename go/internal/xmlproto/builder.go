@@ -70,12 +70,29 @@ func BuildGetTargetsXML(alias, id string) string {
 }
 
 // BuildSetBreakpointsXML builds setBreakpoints request XML with three namespaces.
-func BuildSetBreakpointsXML(alias, id string, bp *BPWorkspace) string {
+//
+// compactBPInfo limits <bpInfo> to <line> and <isActive>. Platforms before
+// 8.3.24 don't have the conditional/hit-count properties in their
+// debugBreakpoints XDTO package and reject the extended element set with
+// "Ошибка преобразования данных XDTO" (HTTP 400), so no breakpoint is set at all.
+// Checked against debug servers 8.3.10.2667 … 8.5.1.1150: 8.3.23.2157 and older
+// answer 400, 8.3.24.1667 and newer answer 200.
+func BuildSetBreakpointsXML(alias, id string, bp *BPWorkspace, compactBPInfo bool) string {
 	var modulesXml strings.Builder
 	for _, obj := range bp.Objects {
 		// Build breakpoint lines XML
 		var bpLines strings.Builder
 		for _, line := range obj.Lines {
+			if compactBPInfo {
+				bpLines.WriteString(fmt.Sprintf(
+					`<bpInfo xmlns="%s">`+
+						`<line>%d</line>`+
+						`<isActive>true</isActive>`+
+						`</bpInfo>`,
+					nsBP, line,
+				))
+				continue
+			}
 			bpLines.WriteString(fmt.Sprintf(
 				`<bpInfo xmlns="%s">`+
 					`<line>%d</line>`+

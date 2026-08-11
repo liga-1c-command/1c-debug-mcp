@@ -25,6 +25,7 @@ type Config struct {
 	CFPath       string
 	CFEPaths     []string
 	EPFPaths     []string
+	CachePath    string
 	DisableCache bool
 }
 

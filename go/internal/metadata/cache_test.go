@@ -169,6 +169,76 @@ func TestCacheStructure(t *testing.T) {
 	}
 }
 
+func TestCustomCachePath(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfPath := filepath.Join(tmpDir, "src")
+
+	if err := os.MkdirAll(filepath.Join(cfPath, "CommonModules"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	configXML := filepath.Join(cfPath, "Configuration.xml")
+	if err := os.WriteFile(configXML, []byte(`<?xml version="1.0"?><MetaDataObject><Configuration><Name>Test</Name></Configuration></MetaDataObject>`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	moduleXML := filepath.Join(cfPath, "CommonModules", "TestModule.xml")
+	if err := os.WriteFile(moduleXML, []byte(`<?xml version="1.0"?><MetaDataObject uuid="12345678-1234-1234-1234-123456789abc"><CommonModule/></MetaDataObject>`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Cache file in a directory that does not exist yet
+	customPath := filepath.Join(tmpDir, "local", "tmp", "meta-cache.json")
+
+	provider := New()
+	provider.cfPath = cfPath
+	provider.cfePaths = []string{}
+	provider.epfPaths = []string{}
+	provider.cachePath = customPath
+
+	if err := provider.doLoad(cfPath, nil, nil, false); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(customPath); err != nil {
+		t.Fatalf("Cache file not created at custom path: %v", err)
+	}
+
+	// Default location must stay clean
+	if _, err := os.Stat(filepath.Join(tmpDir, cacheFileName)); err == nil {
+		t.Error("Cache was also written to the default location")
+	}
+
+	// Cache from the custom path is picked up on the next start
+	provider2 := New()
+	provider2.cfPath = cfPath
+	provider2.cfePaths = []string{}
+	provider2.epfPaths = []string{}
+	provider2.cachePath = customPath
+
+	if !provider2.loadFromCache() {
+		t.Error("Cache at custom path should be valid but wasn't loaded")
+	}
+
+	if provider2.ModuleCount() != 1 {
+		t.Errorf("Expected 1 module from cache, got %d", provider2.ModuleCount())
+	}
+
+	// A directory as cachePath means "put the default file name in here"
+	cacheDir := filepath.Join(tmpDir, "cachedir")
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	provider3 := New()
+	provider3.cfPath = cfPath
+	provider3.cachePath = cacheDir
+
+	if got, want := provider3.getCachePath(), filepath.Join(cacheDir, cacheFileName); got != want {
+		t.Errorf("Expected cache path %q, got %q", want, got)
+	}
+}
+
 func TestSkipCache(t *testing.T) {
 	tmpDir := t.TempDir()
 	cfPath := filepath.Join(tmpDir, "src")

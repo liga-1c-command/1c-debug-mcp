@@ -48,7 +48,7 @@ func main() {
 
 	// Start metadata loading in background (non-blocking)
 	if cfg.CFPath != "" || len(cfg.CFEPaths) > 0 || len(cfg.EPFPaths) > 0 {
-		metaProvider.Load(cfg.CFPath, cfg.CFEPaths, cfg.EPFPaths, cfg.DisableCache)
+		metaProvider.Load(cfg.CFPath, cfg.CFEPaths, cfg.EPFPaths, cfg.CachePath, cfg.DisableCache)
 	}
 
 	// Log config
@@ -228,12 +228,13 @@ func registerTools(s *server.MCPServer, deps *tools.Deps) {
 // parseConfig reads configuration from environment variables and CLI flags.
 // CLI flags take priority over environment variables.
 func parseConfig() *tools.Config {
-	var urlFlag, aliasFlag, passwordFlag, cfPathFlag string
+	var urlFlag, aliasFlag, passwordFlag, cfPathFlag, cachePathFlag string
 
 	flag.StringVar(&urlFlag, "url", "", "Debug server URL (overrides ONEC_DEBUG_URL)")
 	flag.StringVar(&aliasFlag, "alias", "", "Infobase alias (overrides ONEC_INFOBASE_ALIAS)")
 	flag.StringVar(&passwordFlag, "password", "", "Debug server password (overrides ONEC_DEBUG_PASSWORD)")
 	flag.StringVar(&cfPathFlag, "cf-path", "", "Path to configuration sources (overrides ONEC_CF_PATH)")
+	flag.StringVar(&cachePathFlag, "cache-path", "", "Path to metadata cache file or directory (overrides ONEC_CACHE_PATH)")
 	flag.Parse()
 
 	cfg := &tools.Config{
@@ -243,6 +244,7 @@ func parseConfig() *tools.Config {
 		CFPath:       orStr(cfPathFlag, os.Getenv("ONEC_CF_PATH")),
 		CFEPaths:     splitPaths(os.Getenv("ONEC_CFE_PATHS")),
 		EPFPaths:     splitPaths(os.Getenv("ONEC_EPF_PATHS")),
+		CachePath:    orStr(cachePathFlag, os.Getenv("ONEC_CACHE_PATH")),
 		DisableCache: os.Getenv("ONEC_DISABLE_CACHE") == "true",
 	}
 	return cfg

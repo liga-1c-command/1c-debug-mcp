@@ -27,14 +27,25 @@ type MetadataCache struct {
 
 const cacheVersion = "1.0"
 
+// cacheFileName is the default name of the cache file.
+const cacheFileName = ".1c-debug-metadata-cache.json"
+
 // getCachePath returns the path to the cache file.
+// An explicit path (ONEC_CACHE_PATH) wins; if it points to an existing
+// directory, the default file name is appended. Without it the cache is
+// stored in the same directory as the configuration.
 func (p *Provider) getCachePath() string {
+	if p.cachePath != "" {
+		if info, err := os.Stat(p.cachePath); err == nil && info.IsDir() {
+			return filepath.Join(p.cachePath, cacheFileName)
+		}
+		return p.cachePath
+	}
 	if p.cfPath == "" {
 		return ""
 	}
-	// Store cache in the same directory as the configuration
 	dir := filepath.Dir(p.cfPath)
-	return filepath.Join(dir, ".1c-debug-metadata-cache.json")
+	return filepath.Join(dir, cacheFileName)
 }
 
 // computePathsHash creates a hash of all paths to detect configuration changes.
@@ -189,6 +200,12 @@ func (p *Provider) saveToCache() error {
 	data, err := json.MarshalIndent(cache, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal cache: %w", err)
+	}
+
+	if dir := filepath.Dir(cachePath); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("create cache dir: %w", err)
+		}
 	}
 
 	if err := os.WriteFile(cachePath, data, 0644); err != nil {

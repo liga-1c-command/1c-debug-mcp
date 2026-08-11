@@ -43,6 +43,7 @@ type Provider struct {
 	cfPath         string
 	cfePaths       []string
 	epfPaths       []string
+	cachePath      string
 	disableCache   bool
 }
 
@@ -55,11 +56,14 @@ func New() *Provider {
 }
 
 // Load starts background loading of metadata from the given paths.
-func (p *Provider) Load(cfPath string, cfePaths, epfPaths []string, disableCache bool) {
+// cachePath overrides the location of the metadata cache file; empty means
+// the default (next to the configuration sources).
+func (p *Provider) Load(cfPath string, cfePaths, epfPaths []string, cachePath string, disableCache bool) {
 	p.mu.Lock()
 	p.cfPath = cfPath
 	p.cfePaths = cfePaths
 	p.epfPaths = epfPaths
+	p.cachePath = cachePath
 	p.disableCache = disableCache
 	p.mu.Unlock()
 

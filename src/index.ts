@@ -4,9 +4,10 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from "url";
 
 // Log to file — overwrite on each start
-const logFile = path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1')), "1c-debug.log");
+const logFile = path.join(path.dirname(fileURLToPath(import.meta.url)), "1c-debug.log");
 const logStream = fs.createWriteStream(logFile, { flags: "w" });
 const origStderr = process.stderr.write.bind(process.stderr);
 (process.stderr as NodeJS.WriteStream).write = (chunk: string | Uint8Array, ...args: unknown[]): boolean => {
